@@ -1,0 +1,9 @@
+<script.*?>.*?</script>
+alert\s*\((.*?)\)
+document\.write\s*\((.*?)\)
+eval\s*\((.*?)\)
+on\w+\s*=\s*(['\"].*?['\"])
+window\.location\s*=\s*['\"].*?['\"]
+setTimeout\s*\((.*?)\)
+setInterval\s*\((.*?)\)
+<iframe.*?>.*?</iframe>

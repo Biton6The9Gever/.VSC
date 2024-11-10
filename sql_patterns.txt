@@ -1,0 +1,15 @@
+'
+"
+--
+;
+#
+\/\*
+\*\/
+UNION
+SELECT
+INSERT
+UPDATE
+DELETE
+DROP
+OR
+AND

@@ -7,69 +7,108 @@ app = Flask(__name__)
 # Target ASP.NET site (update with your actual target URL)
 TARGET_URL = 'https://localhost:44330/01LoginPage.aspx'  # Change to protect 01LoginPage.aspx
 
-# XSS detection pattern (matches <script> tags and alert() calls)
-xss_pattern = re.compile(r'<script.*?>.*?</script>|alert\((.*?)\)', re.IGNORECASE)
+# Load XSS and SQL injection patterns from files
+def load_patterns(file_path):
+    with open(file_path, 'r') as file:
+        patterns = [line.strip() for line in file if line.strip()]
+    return patterns
+
+# Compile patterns into regex
+def compile_pattern(patterns):
+    return re.compile("|".join(patterns), re.IGNORECASE)
+
+# Load and compile patterns
+xss_patterns = compile_pattern(load_patterns(r"D:\Biton\VisualStudio\WAF-Project\xss_patterns.txt"))
+sql_patterns = compile_pattern(load_patterns(r"D:\Biton\VisualStudio\WAF-Project\sql_patterns.txt"))
+
+# XSS detection function
+def check_xss(user_input):
+    return xss_patterns.search(user_input) is not None
+
+# SQL injection detection function
+def check_sql_injection(user_input):
+    return sql_patterns.search(user_input) is not None
 
 # Get the IP like a pro
 def get_ip():
     """Get the IP address of the client making the request."""
     return request.remote_addr
 
-# Function to check if input contains XSS
-def is_xss_safe(user_input):
-    if xss_pattern.search(user_input):
-        return False
-    return True
-
-@app.route('/01LoginPage.aspx', methods=['GET', 'POST'])  # Protecting the login page now
-def proxy_site():
-    print("Incoming request to /01LoginPage.aspx")
-    
-    try:
-        # Check GET request for XSS (in query params)
+# Function to handle XSS detection for GET and POST data
+def handle_xss_detection():
+    # Check for XSS in GET request parameters
+    if request.method == 'GET':
         user_input = request.args.get('user_input', '')
-        print(f"GET user_input: {user_input}")
-        if user_input and not is_xss_safe(user_input):
+        if check_xss(user_input):
             print("Potential XSS detected in GET request!")
             return "Potential XSS attack detected!", 400
 
-        # Check POST request for XSS (in form data: txtUsername and txtPassword)
-        if request.method == 'POST':
-            # Check username and password input for XSS
-            username = request.form.get('txtUsername', '')
-            password = request.form.get('txtPassword', '')
-            print(f"POST username: {username}, password: {password}")
-            if not is_xss_safe(username) or not is_xss_safe(password):
-                print(f"Potential XSS detected in POST request! {get_ip()}")
-                return f"Potential XSS attack detected! {get_ip()}", 400
+    # Check for XSS in POST request fields
+    elif request.method == 'POST':
+        username = request.form.get('txtUsername', '')
+        password = request.form.get('txtPassword', '')
+        if check_xss(username) or check_xss(password):
+            print("Potential XSS detected in POST request!")
+            return "Potential XSS attack detected!", 400
 
-            # Check if any part of the alert script or XSS in response is detected (error message)
-            if 'alert' in request.form.get('btnSubmit', ''):
-                print("Potential XSS detected in button submission!")
-                return "Potential XSS attack detected!", 400
+    return None  # Return None if no XSS detected
 
-        # If input is safe, forward the request to the target ASP.NET site
+# Function to handle SQL injection detection for GET and POST data
+def handle_sql_injection_detection():
+    # Check for SQL injection in GET request parameters
+    if request.method == 'GET':
+        user_input = request.args.get('user_input', '')
+        if check_sql_injection(user_input):
+            print("Potential SQL Injection detected in GET request!")
+            return "Potential SQL Injection detected!", 400
+
+    # Check for SQL injection in POST request fields
+    elif request.method == 'POST':
+        username = request.form.get('txtUsername', '')
+        password = request.form.get('txtPassword', '')
+        if check_sql_injection(username) or check_sql_injection(password):
+            print("Potential SQL Injection detected in POST request!")
+            return "Potential SQL Injection detected!", 400
+
+    return None  # Return None if no SQL injection detected
+
+
+@app.route('/01LoginPage.aspx', methods=['GET', 'POST'])
+def proxy_site():
+    print("Incoming request to /01LoginPage.aspx")
+
+    try:
+        # Check for XSS and SQL injection vulnerabilities
+        xss_response = handle_xss_detection()
+        if xss_response:
+            return xss_response  # Return error response if XSS is detected
+
+        sql_injection_response = handle_sql_injection_detection()
+        if sql_injection_response:
+            return sql_injection_response  # Return error response if SQL injection is detected
+
+        # Forward the request to the target ASP.NET site if input is safe
         if request.method == 'GET':
             resp = requests.get(TARGET_URL, params=request.args, verify=False)
         else:
             resp = requests.post(TARGET_URL, data=request.form, verify=False)
 
-        # Check if the response contains static resource URLs (like CSS)
+        # Modify response content if necessary
         if 'text/html' in resp.headers['Content-Type']:
-            # Check if any static resources (like CSS) need to be decoded
             html_content = resp.content.decode('utf-8')
-            # Rewrite the link to the correct path for your CSS file (handle absolute/relative links)
             html_content = html_content.replace('href="10LoginStyle.css"', 'href="/static/10LoginStyle.css"')
-            html_content = html_content.replace('src="Images/The_Krusty_Krab.png"', 'src="/static/The_Krusty_Krab.png"')
             return Response(html_content, status=resp.status_code, content_type='text/html')
-        
-        
-        # Forward the response from the target site
+
+        # Return the target site's response
         return Response(resp.content, status=resp.status_code, content_type=resp.headers['Content-Type'])
 
     except Exception as e:
         print(f"Error: {str(e)}")
         return f"Internal Server Error: {str(e)}", 500
 
+
+
+
+
 if __name__ == '__main__':
-    app.run(debug=True, ssl_context='adhoc', port=5000)   # Running on https://localhost:5000
+    app.run(debug=True, ssl_context='adhoc', port=6969)   # Running on https://localhost:6969
