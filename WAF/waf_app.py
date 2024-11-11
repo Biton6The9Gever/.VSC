@@ -20,7 +20,7 @@ def compile_pattern(patterns):
 # Load and compile patterns
 xss_patterns = compile_pattern(load_patterns(r"D:\Biton\VisualStudio\WAF-Project\WAF\xss_patterns.txt"))
 sql_patterns = compile_pattern(load_patterns(r"D:\Biton\VisualStudio\WAF-Project\WAF\sql_patterns.txt"))
-
+command_injection_patterns=compile_pattern(load_patterns(r"D:\Biton\VisualStudio\WAF-Project\WAF\command_injection_patterns.txt"))
 # XSS detection function
 def check_xss(user_input):
     return xss_patterns.search(user_input) is not None
@@ -28,6 +28,10 @@ def check_xss(user_input):
 # SQL injection detection function
 def check_sql_injection(user_input):
     return sql_patterns.search(user_input) is not None
+# Command injection detection function
+def check_command_injection(user_input):
+    return command_injection_patterns.search(user_input) is not None
+
 
 # Get the IP like a pro
 def get_ip():
@@ -71,8 +75,23 @@ def handle_sql_injection_detection():
             return "Potential SQL Injection detected!", 400
 
     return None  # Return None if no SQL injection detected
+# Function to handle Command injection detection for GET and POST data
+def handle_command_injection_detection():
+    # Check for Command injection in GET request parameters
+    if request.method == 'GET':
+        user_input = request.args.get('user_input', '')
+        if check_sql_injection(user_input):
+            print("Potential SQL Injection detected in GET request!")
+            return "Potential SQL Injection detected!", 400
 
-
+    # Check for Command injection in POST request fields
+    elif request.method == 'POST':
+        username = request.form.get('txtUsername', '')
+        password = request.form.get('txtPassword', '')
+        if check_sql_injection(username) or check_sql_injection(password):
+            print("Potential Command Injection detected in POST request!")
+            return "Potential Command Injection detected!", 400
+    
 @app.route('/01LoginPage.aspx', methods=['GET', 'POST'])
 def proxy_site():
     print("Incoming request to /01LoginPage.aspx")
@@ -86,6 +105,10 @@ def proxy_site():
         sql_injection_response = handle_sql_injection_detection()
         if sql_injection_response:
             return sql_injection_response  # Return error response if SQL injection is detected
+        
+        command_injection_response=handle_command_injection_detection()
+        if command_injection_response:
+            return command_injection_response
 
         # Forward the request to the target ASP.NET site if input is safe
         if request.method == 'GET':

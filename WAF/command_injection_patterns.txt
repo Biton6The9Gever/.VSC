@@ -1,0 +1,1 @@
+;|\||&&|\|\||`|\$|>|<|\(|\)|\*|eval|exec|system|bash|sh|python|perl|nc|cat|curl|wget|rm|ls
